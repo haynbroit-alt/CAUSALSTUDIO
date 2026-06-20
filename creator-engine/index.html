@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creator Engine v1 — TikTok Script Machine</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #08080f;
+  --surface: #0f0f1a;
+  --surface2: #16162a;
+  --border: #2a2a42;
+  --primary: #7c3aed;
+  --primary-light: #a855f7;
+  --primary-glow: rgba(124,58,237,0.2);
+  --blue: #3b82f6;
+  --green: #10b981;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --orange: #f97316;
+  --text: #e2e8f0;
+  --dim: #94a3b8;
+  --dim2: #4a5568;
+}
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+body { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── HEADER ── */
+#header {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px; height: 56px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; position: sticky; top: 0; z-index: 100;
+}
+.logo {
+  font-size: 16px; font-weight: 800; letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #a855f7, #3b82f6);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+.logo-v { font-size: 11px; font-weight: 400; color: var(--dim); -webkit-text-fill-color: var(--dim); }
+.tabs { display: flex; gap: 2px; }
+.tab-btn {
+  background: none; border: none; color: var(--dim);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); background: var(--surface2); }
+.tab-btn.active { color: var(--primary-light); background: var(--primary-glow); }
+#settings-toggle {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 6px; padding: 5px 12px;
+  cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+#settings-toggle:hover { border-color: var(--primary); color: var(--primary-light); }
+#backend-status {
+  font-size: 11px; color: var(--dim2); white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--dim2);
+}
+.status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* ── SETTINGS PANEL ── */
+#settings-panel {
+  display: none;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 20px; gap: 16px; align-items: center; flex-wrap: wrap;
+}
+#settings-panel.open { display: flex; }
+.settings-field { display: flex; align-items: center; gap: 8px; }
+.settings-field label { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.settings-field input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 5px; padding: 5px 10px; font-size: 12px; width: 280px; outline: none;
+}
+.settings-field input:focus { border-color: var(--primary); }
+.settings-note { font-size: 11px; color: var(--dim2); }
+
+/* ── MAIN ── */
+#main {
+  flex: 1; display: flex; overflow: hidden;
+}
+
+/* ── TAB SECTIONS ── */
+.tab-section { display: none; flex: 1; overflow: hidden; }
+.tab-section.active { display: flex; }
+
+/* ── SPLIT LAYOUT ── */
+.split {
+  display: grid; grid-template-columns: 340px 1fr;
+  flex: 1; overflow: hidden;
+}
+.panel-left {
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.panel-right {
+  overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── FORM COMPONENTS ── */
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--dim);
+}
+.field-input, .field-select, .field-textarea {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 7px; padding: 9px 12px;
+  font-size: 13px; outline: none; transition: border-color 0.15s;
+  font-family: inherit;
+}
+.field-input:focus, .field-select:focus, .field-textarea:focus {
+  border-color: var(--primary);
+}
+.field-textarea { resize: vertical; min-height: 100px; }
+.field-select { cursor: pointer; }
+.field-hint { font-size: 11px; color: var(--dim2); }
+
+/* ── CHIP GRID ── */
+.chip-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--dim); border-radius: 20px; padding: 4px 12px;
+  font-size: 11px; cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.chip:hover, .chip.selected {
+  border-color: var(--primary); color: var(--primary-light);
+  background: var(--primary-glow);
+}
+
+/* ── BUTTONS ── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--blue));
+  border: none; color: #fff; border-radius: 8px;
+  padding: 11px 24px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: opacity 0.15s; width: 100%;
+  letter-spacing: 0.3px;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:active { opacity: 0.75; }
+.btn-primary.loading { opacity: 0.6; pointer-events: none; }
+.btn-secondary {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--dim); border-radius: 6px; padding: 5px 12px;
+  font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.btn-secondary:hover { border-color: var(--primary); color: var(--primary-light); }
+
+/* ── OUTPUT CARDS ── */
+.output-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.output-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.output-card-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.output-card-label.hook { color: var(--orange); }
+.output-card-label.script { color: var(--blue); }
+.output-card-label.cta { color: var(--green); }
+.output-card-body {
+  padding: 14px; font-size: 13px; line-height: 1.7;
+  white-space: pre-wrap; color: var(--text);
+  min-height: 60px;
+}
+.copy-btn {
+  background: none; border: 1px solid var(--border); color: var(--dim2);
+  border-radius: 5px; padding: 3px 10px; font-size: 11px;
+  cursor: pointer; transition: all 0.15s;
+}
+.copy-btn:hover { border-color: var(--green); color: var(--green); }
+.copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+/* ── VIRAL SCORE ── */
+.score-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+}
+.score-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.score-total {
+  font-size: 42px; font-weight: 800; line-height: 1;
+  background: linear-gradient(135deg, var(--primary-light), var(--blue));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.score-label { font-size: 16px; font-weight: 700; }
+.score-bar-wrap { margin-bottom: 14px; }
+.score-bar-track {
+  height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden;
+}
+.score-bar-fill {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--blue));
+  transition: width 0.6s cubic-bezier(.4,0,.2,1);
+}
+.score-dimensions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.score-dim { background: var(--surface2); border-radius: 7px; padding: 10px 12px; }
+.score-dim-label { font-size: 11px; color: var(--dim); margin-bottom: 4px; }
+.score-dim-val { font-size: 18px; font-weight: 700; }
+.score-dim-val.high { color: var(--green); }
+.score-dim-val.mid { color: var(--yellow); }
+.score-dim-val.low { color: var(--red); }
+.score-suggestions { display: flex; flex-direction: column; gap: 6px; }
+.score-suggestion {
+  background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 6px; padding: 7px 10px; font-size: 12px; color: var(--yellow);
+}
+
+/* ── IDEAS GRID ── */
+.ideas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.idea-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px; transition: border-color 0.15s;
+}
+.idea-card:hover { border-color: var(--primary); }
+.idea-text { font-size: 13px; line-height: 1.5; flex: 1; }
+.idea-score { font-size: 11px; color: var(--dim2); white-space: nowrap; margin-top: 2px; }
+.idea-rank {
+  font-size: 11px; font-weight: 700; color: var(--primary-light);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* ── SCORER LAYOUT ── */
+#tab-scorer .panel-right {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.score-full-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 20px;
+}
+
+/* ── VIDEO TAB ── */
+#tab-video .split { grid-template-columns: 1fr 1fr; }
+.video-section { padding: 20px; }
+.code-block {
+  background: #0d1117; border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px;
+  font-family: 'Consolas', 'JetBrains Mono', monospace;
+  font-size: 12px; line-height: 1.6; color: #7dd3fc;
+  white-space: pre; overflow-x: auto;
+}
+.step-card {
+  background: var(--surface2); border-radius: 8px; padding: 14px;
+  border-left: 3px solid var(--primary);
+}
+.step-number { font-size: 11px; color: var(--primary-light); font-weight: 700; margin-bottom: 4px; }
+.step-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.step-desc { font-size: 12px; color: var(--dim); line-height: 1.5; }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 20px; gap: 12px; color: var(--dim2); text-align: center;
+  min-height: 200px;
+}
+.empty-icon { font-size: 36px; opacity: 0.5; }
+.empty-text { font-size: 13px; }
+
+/* ── SECTION TITLE ── */
+.section-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.section-sub { font-size: 11px; color: var(--dim2); margin-top: 2px; }
+
+/* ── NICHE BADGE ── */
+.niche-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--primary-glow); border: 1px solid var(--primary);
+  color: var(--primary-light); border-radius: 20px;
+  padding: 2px 10px; font-size: 11px; font-weight: 600;
+}
+
+/* ── REGENERATE ── */
+.regen-row { display: flex; gap: 8px; align-items: center; }
+.regen-row .btn-secondary { white-space: nowrap; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dim2); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="logo">CREATOR ENGINE <span class="logo-v">v1</span></div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="script">🎬 Script</button>
+    <button class="tab-btn" data-tab="ideas">🔥 Idées Virales</button>
+    <button class="tab-btn" data-tab="scorer">📊 Viral Score</button>
+    <button class="tab-btn" data-tab="video">✂️ Video Cutter</button>
+  </nav>
+  <div id="backend-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">règles</span>
+  </div>
+  <button id="settings-toggle">⚙ API</button>
+</header>
+
+<!-- SETTINGS -->
+<div id="settings-panel">
+  <div class="settings-field">
+    <label>Claude API Key</label>
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." />
+  </div>
+  <div class="settings-field">
+    <label>Backend URL</label>
+    <input type="text" id="backend-url" value="http://localhost:5050" style="width:200px;" />
+  </div>
+  <button class="btn-secondary" id="test-backend">Tester connexion</button>
+  <span class="settings-note">Sans API : génération par templates. Avec API : Claude génère du contenu unique.</span>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- ══════════════════ SCRIPT TAB ══════════════════ -->
+  <section class="tab-section active" id="tab-script">
+    <div class="split">
+
+      <!-- LEFT: INPUT -->
+      <div class="panel-left">
+        <div>
+          <div class="section-title">Générateur de Script</div>
+          <div class="section-sub">Transforme un sujet en script TikTok prêt à poster</div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Sujet / Niche</div>
+          <input class="field-input" id="script-topic" type="text"
+            placeholder="ex: fitness, crypto, business, IA…" />
+          <div class="field-hint">Sois précis → meilleur résultat</div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Format</div>
+          <div class="chip-grid" id="format-chips">
+            <div class="chip selected" data-val="storytelling">📖 Storytelling</div>
+            <div class="chip" data-val="mrbeast">⚡ MrBeast</div>
+            <div class="chip" data-val="tutorial">📋 Tutorial</div>
+            <div class="chip" data-val="contrarian">🔥 Contrarian</div>
+            <div class="chip" data-val="drama">🎭 Drama</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Type de Hook</div>
+          <div class="chip-grid" id="hook-chips">
+            <div class="chip selected" data-val="curiosity">🤔 Curiosité</div>
+            <div class="chip" data-val="fear">😨 Peur/FOMO</div>
+            <div class="chip" data-val="proof">💪 Preuve sociale</div>
+            <div class="chip" data-val="contrarian">⚡ Contrarian</div>
+            <div class="chip" data-val="story">📖 Story</div>
+            <div class="chip" data-val="shock">😱 Choc</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Plateforme</div>
+          <div class="chip-grid" id="platform-chips">
+            <div class="chip selected" data-val="tiktok">TikTok</div>
+            <div class="chip" data-val="shorts">YouTube Shorts</div>
+            <div class="chip" data-val="reels">Instagram Reels</div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="generate-script-btn">
+          ▶ Générer le Script
+        </button>
+
+        <div class="field-group">
+          <div class="field-label">Exemples rapides</div>
+          <div class="chip-grid">
+            <div class="chip example-chip" data-topic="fitness motivation">💪 Fitness</div>
+            <div class="chip example-chip" data-topic="crypto investissement">💰 Crypto</div>
+            <div class="chip example-chip" data-topic="business en ligne">🚀 Business</div>
+            <div class="chip example-chip" data-topic="outils IA productivité">🤖 IA Tools</div>
+            <div class="chip example-chip" data-topic="discipline mindset">🧠 Mindset</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: OUTPUT -->
+      <div class="panel-right" id="script-output">
+        <div class="empty-state">
+          <div class="empty-icon">🎬</div>
+          <div class="empty-text">Entre un sujet et clique sur Générer</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ IDEAS TAB ══════════════════ -->
+  <section class="tab-section" id="tab-ideas">
+    <div class="split">
+      <div class="panel-left">
+        <div>
+          <div class="section-title">Machine à Idées Virales</div>
+          <div class="section-sub">12 angles optimisés pour ton sujet</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Sujet</div>
+          <input class="field-input" id="ideas-topic" type="text"
+            placeholder="ex: perte de poids, trading, freelance…" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">Style des titres</div>
+          <div class="chip-grid" id="ideas-style-chips">
+            <div class="chip selected" data-val="mixed">🔀 Mixte</div>
+            <div class="chip" data-val="curiosity">🤔 Curiosité</div>
+            <div class="chip" data-val="numbers">🔢 Chiffres</div>
+            <div class="chip" data-val="story">📖 Story</div>
+          </div>
+        </div>
+        <button class="btn-primary" id="generate-ideas-btn">▶ Générer 12 Idées</button>
+        <div class="field-group">
+          <div class="field-label">Exemples</div>
+          <div class="chip-grid">
+            <div class="chip example-ideas" data-topic="perte de poids">🏃 Poids</div>
+            <div class="chip example-ideas" data-topic="investissement bourse">📈 Bourse</div>
+            <div class="chip example-ideas" data-topic="freelance développeur">💻 Freelance</div>
+            <div class="chip example-ideas" data-topic="méditation stress">🧘 Mental</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-right" id="ideas-output">
+        <div class="empty-state">
+          <div class="empty-icon">🔥</div>
+          <div class="empty-text">Entre un sujet pour générer des idées virales</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ SCORER TAB ══════════════════ -->
+  <section class="tab-section" id="tab-scorer">
+    <div class="split">
+      <div class="panel-left">
+        <div>
+          <div class="section-title">Viral Scorer</div>
+          <div class="section-sub">Score 0–100 avec analyse détaillée</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Hook (0–3 secondes)</div>
+          <input class="field-input" id="score-hook" type="text"
+            placeholder="Colle ton hook ici…" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">Script / Corps</div>
+          <textarea class="field-textarea" id="score-body"
+            placeholder="Colle ton script ici…" style="min-height:120px;"></textarea>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Call to Action</div>
+          <input class="field-input" id="score-cta" type="text"
+            placeholder="Ton CTA…" />
+        </div>
+        <button class="btn-primary" id="score-btn">📊 Analyser</button>
+      </div>
+      <div class="panel-right" id="scorer-output">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-text">Colle un script pour l'analyser</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ VIDEO TAB ══════════════════ -->
+  <section class="tab-section" id="tab-video">
+    <div class="split" style="grid-template-columns:1fr 1fr;">
+
+      <div class="panel-left" style="border-right:1px solid var(--border);">
+        <div>
+          <div class="section-title">✂️ Video Cutter</div>
+          <div class="section-sub">Auto-découpe YouTube → TikTok / Shorts / Reels</div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-number">ÉTAPE 1</div>
+          <div class="step-title">Installe les dépendances</div>
+          <div class="step-desc">Lance server.py (dans ce dossier) pour activer le video cutter IA</div>
+        </div>
+
+        <div class="code-block">pip install flask anthropic moviepy yt-dlp
+python server.py</div>
+
+        <div class="step-card">
+          <div class="step-number">ÉTAPE 2</div>
+          <div class="step-title">Découpe manuelle avec ffmpeg</div>
+          <div class="step-desc">Commandes prêtes à copier pour chaque type de short</div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Fichier vidéo source</div>
+          <input class="field-input" id="video-source" type="text" value="video.mp4" />
+        </div>
+        <div class="field-group">
+          <div class="field-label">Segments (début-fin en sec, un par ligne)</div>
+          <textarea class="field-textarea" id="video-segments"
+            placeholder="0-30&#10;45-90&#10;120-150">0-30
+45-90
+120-150</textarea>
+        </div>
+        <button class="btn-primary" id="gen-ffmpeg-btn">⚙ Générer commandes FFmpeg</button>
+      </div>
+
+      <div class="panel-right" id="video-output">
+        <div class="section-title" style="margin-bottom:12px;">Commandes FFmpeg</div>
+        <div id="ffmpeg-commands">
+          <div class="empty-state">
+            <div class="empty-icon">✂️</div>
+            <div class="empty-text">Définis tes segments et génère les commandes</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <div class="section-title" style="margin-bottom:10px;">🤖 Avec server.py actif</div>
+          <div class="field-group">
+            <div class="field-label">URL YouTube</div>
+            <input class="field-input" id="yt-url" type="text"
+              placeholder="https://youtube.com/watch?v=…" />
+          </div>
+          <button class="btn-primary" style="margin-top:8px;" id="auto-cut-btn">
+            🎯 Auto-découpe intelligente
+          </button>
+          <div id="auto-cut-result" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- #main -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// TEMPLATE ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+const NICHES = {
+  fitness: {
+    name: 'Fitness', emoji: '💪',
+    keywords: ['sport','fitness','muscl','maigr','poids','gym','regime','cardio','abs','ventre','calories','minceur','coach','seche','masse'],
+    problems: ['tu stagnes depuis des semaines','tu manques de motivation','tu ne perds pas de poids malgré tes efforts','tu fais les mauvais exercices','tu ne sais pas quoi manger'],
+    solutions: ['cette méthode simple en 10 min/jour','ce protocole utilisé par les pros','ce plan sur 21 jours','cette astuce méconnue','ce déficit calorique calculé'],
+    results: ['perdre 5kg en 30 jours','avoir des abdos visibles','doubler ta force','transformer ton physique','te sentir mieux dans ton corps'],
+    experts: ['coachs sportifs','nutritionnistes','bodybuilders pro','athlètes olympiques'],
+    loss: ['des semaines d\'entraînement','tes résultats en plateau','ta santé sur le long terme'],
+    time: ['30 jours','21 jours','8 semaines','3 mois'],
+  },
+  finance: {
+    name: 'Finance / Crypto', emoji: '💰',
+    keywords: ['argent','crypto','invest','trader','bours','financ','euro','dollar','bitcoin','revenus','épargne','riche','passif','rendement'],
+    problems: ['tu travailles pour rien','tu perds de l\'argent en crypto','tu ne sais pas où investir','l\'inflation mange tes économies','tu n\'arrives pas à épargner'],
+    solutions: ['cette stratégie simple des 10%','ce portefeuille anti-inflation','cette méthode DCA','cet outil d\'analyse gratuit','ce système d\'automatisation'],
+    results: ['générer 500€/mois passifs','doubler ton épargne en 3 ans','quitter ton 9-5','atteindre la liberté financière','vivre de tes investissements'],
+    experts: ['traders pro','gestionnaires de fonds','millionnaires autodidactes','investisseurs institutionnels'],
+    loss: ['des milliers d\'euros','6 mois d\'épargne','des opportunités majeures','ton capital'],
+    time: ['30 jours','6 mois','1 an','3 ans'],
+  },
+  business: {
+    name: 'Business', emoji: '🚀',
+    keywords: ['business','entreprise','startup','client','vente','marketing','freelanc','agenc','saas','dropshipping','ecommerce','revenus','vendre'],
+    problems: ['tu n\'arrives pas à trouver des clients','ton marketing ne convertit pas','tu travailles 12h pour 1000€','tu n\'as pas de système qui tourne seul','tu sais pas comment scaler'],
+    solutions: ['ce système de prospection automatique','cette offre irrésistible','ce funnel simplifié','cet email qui convertit à 40%','cette stratégie de contenu'],
+    results: ['faire 10k€/mois','automatiser ton acquisition','trouver 10 clients en 30 jours','scaler à 6 chiffres','quitter ton emploi salarié'],
+    experts: ['entrepreneurs 7 chiffres','coachs business','fondateurs de startups','investisseurs'],
+    loss: ['des clients potentiels','des milliers en CA','des mois de travail','ton temps'],
+    time: ['30 jours','3 mois','6 mois','1 an'],
+  },
+  motivation: {
+    name: 'Mindset', emoji: '🧠',
+    keywords: ['motiv','success','mind','mental','habit','routine','discipline','productiv','focus','goal','objectif','développement'],
+    problems: ['tu procrastines toujours','tu n\'arrives pas à te discipliner','tu abandonnes avant d\'atteindre tes objectifs','tu sais pas par où commencer','tu sabotes tes propres efforts'],
+    solutions: ['cette routine du matin en 5 min','cette technique de focus ultime','ce changement de mindset qui change tout','ces 3 habitudes des gens qui réussissent','ce système de goals hebdomadaires'],
+    results: ['changer ta vie en 30 jours','devenir inarrêtable','atteindre tous tes objectifs','transformer ta productivité','construire une discipline en béton'],
+    experts: ['Navy SEALs','PDG de Fortune 500','athlètes olympiques','coaches de haut niveau'],
+    loss: ['des années de ta vie','ton potentiel inexploité','tes rêves les plus importants'],
+    time: ['30 jours','21 jours','3 mois','1 an'],
+  },
+  tech: {
+    name: 'Tech / IA', emoji: '🤖',
+    keywords: ['tech','ia','ai','outil','tool','code','app','logiciel','chatgpt','midjourney','automation','no-code','prompt','robot'],
+    problems: ['tu perds 3h/jour sur des tâches répétitives','tu ne connais pas ces outils qui changent tout','tu es déjà en retard sur la révolution IA','tes concurrents s\'automatisent pendant que tu travailles manuellement'],
+    solutions: ['ces 5 outils IA totalement gratuits','cette automation en 10 minutes','ce prompt secret que j\'utilise','ce workflow qui remplace un assistant','cet outil que personne ne connaît encore'],
+    results: ['gagner 3h par jour','automatiser 80% de tes tâches','10× ta productivité','générer du contenu en 5 min','remplacer une équipe entière'],
+    experts: ['ingénieurs Google','fondateurs de startups IA','dev top Silicon Valley','experts IA'],
+    loss: ['des heures chaque semaine','ton avantage compétitif','ta place dans le marché de demain'],
+    time: ['1 semaine','30 jours','1 jour','3 heures'],
+  },
+};
+
+function detectNiche(topic) {
+  const t = topic.toLowerCase();
+  for (const [key, n] of Object.entries(NICHES)) {
+    if (n.keywords.some(k => t.includes(k))) return key;
+  }
+  return 'motivation';
+}
+
+function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// ─── HOOKS ──────────────────────────────────────────────────────
+const HOOKS = {
+  curiosity: [
+    "Personne ne te dit ça sur {TOPIC}…",
+    "Le secret que les {EXPERTS} cachent sur {TOPIC}",
+    "Ce que j'ai découvert sur {TOPIC} va tout changer pour toi",
+    "Pourquoi tout ce qu'on t'apprend sur {TOPIC} est faux",
+    "La vérité sur {TOPIC} que personne n'ose dire",
+  ],
+  fear: [
+    "Tu fais cette erreur avec {TOPIC} et tu {PROBLEM}",
+    "⚠️ Arrête de faire ça avec {TOPIC}. Maintenant.",
+    "{NB} personnes ont ruiné leurs chances à cause de {TOPIC}",
+    "Cette erreur m'a coûté {LOSS} — ne fais pas comme moi",
+    "Si tu rates ça sur {TOPIC}, tu vas regretter",
+  ],
+  proof: [
+    "De 0 à {RESULT} en {TIME} — voilà comment",
+    "J'ai {RESULT} en {TIME} avec juste cette méthode",
+    "Ce plan m'a permis de {RESULT} en {TIME}",
+    "{NB} de mes clients ont {RESULT} grâce à ça",
+    "Comment j'ai transformé ma situation avec {TOPIC}",
+  ],
+  contrarian: [
+    "STOP. Ce qu'on te dit sur {TOPIC} est un mensonge.",
+    "Le conseil classique sur {TOPIC} que tu suis ? C'est faux.",
+    "Pourquoi je ne suis PAS les conseils habituels sur {TOPIC}",
+    "Tout le monde dit ça sur {TOPIC}. Tout le monde a tort.",
+    "Le paradoxe de {TOPIC} que personne n'explique jamais",
+  ],
+  story: [
+    "Il y a {TIME}, j'étais exactement là où tu es. Puis tout a changé.",
+    "Mon pire moment avec {TOPIC} m'a appris quelque chose d'incroyable.",
+    "Comment {TOPIC} a changé ma vie en {TIME}",
+    "La vraie raison pour laquelle j'ai commencé avec {TOPIC}",
+    "Ce que {TOPIC} m'a appris que l'école n'enseigne jamais",
+  ],
+  shock: [
+    "J'ai tout testé sur {TOPIC} pendant {TIME}. Voilà la vérité.",
+    "ATTENDS. Avant de commencer avec {TOPIC}, regarde ça.",
+    "Ils m'ont dit que c'était impossible. J'ai {RESULT}.",
+    "Ce moment a tout changé pour moi sur {TOPIC}.",
+    "Je ne voulais pas partager ça. Mais je dois le dire.",
+  ],
+};
+
+// ─── BODIES ─────────────────────────────────────────────────────
+const BODIES = {
+  mrbeast: (d, topic) =>
+`Voilà ce que personne ne fait :
+
+① ${cap(d.solutions[0])}
+② Évite ça absolument : ${d.problems[0]}
+③ ${cap(d.solutions[1] || d.solutions[0])} — pendant 21 jours minimum
+
+Le résultat ? ${cap(d.results[0])}.
+
+J'ai fait exactement ça.
+Et voilà ce qui s'est passé…`,
+
+  storytelling: (d, topic) =>
+`Il y a 6 mois, j'étais exactement là où tu es.
+
+${cap(d.problems[0])}.
+Aucune solution en vue.
+
+Jusqu'au jour où j'ai découvert ${d.solutions[0]}.
+
+En ${rnd(d.time)}, tout a changé.
+Aujourd'hui j'ai ${d.results[0]}.
+
+Et aujourd'hui je partage exactement comment j'ai fait.`,
+
+  tutorial: (d, topic) =>
+`3 étapes. Simples.
+
+Étape 1 → ${cap(d.solutions[0])}
+Étape 2 → Évite cette erreur classique : ${d.problems[0]}
+Étape 3 → ${cap(d.solutions[1] || d.solutions[0])} — tous les jours
+
+C'est tout. Pas besoin de plus.
+Pour ${d.results[0]}, c'est ce qui marche.`,
+
+  contrarian: (d, topic) =>
+`Tout le monde te dit de faire ${d.solutions[0]}.
+
+C'est faux.
+
+Si tu fais ce que tout le monde fait,
+tu obtiens ce que tout le monde obtient.
+
+La vraie méthode ? ${cap(d.solutions[1] || d.solutions[0])}.
+
+Les ${d.experts[0]} ne veulent pas que tu saches ça.
+Maintenant tu le sais.`,
+
+  drama: (d, topic) =>
+`Je ne voulais pas partager ça.
+
+Mais après avoir vu combien de personnes ${d.problems[0]}…
+J'ai décidé de le dire.
+
+La vérité sur ${topic} :
+
+${cap(d.solutions[0])}.
+
+C'est ça la seule différence entre ceux qui ${d.results[0]}
+et ceux qui échouent encore dans 1 an.
+
+Tu mérites de savoir.`,
+};
+
+const CTAS = [
+  'Commente "GUIDE" pour recevoir le plan complet gratuitement.',
+  'Sauvegarde cette vidéo — tu vas en avoir besoin.',
+  'Tag un ami qui a besoin de voir ça 👇',
+  'Suis-moi pour la partie 2 — ça va encore plus fort.',
+  'Commente "OUI" si ça t\'a parlé.',
+  'Partage à quelqu\'un qui est encore bloqué.',
+  'Abonne-toi pour ne pas rater la suite.',
+  `Commente ton plus grand défi 👇 je réponds à tout.`,
+  'Sauvegarde + Follow = je t\'envoie le plan complet.',
+];
+
+const IDEA_TEMPLATES = [
+  '{NB} erreurs que les débutants font avec {TOPIC}',
+  'J\'ai perdu {LOSS} à cause de {TOPIC}. Ce que j\'ai appris.',
+  'La vérité que personne ne dit sur {TOPIC}',
+  'Comment passer de 0 à {RESULT} avec {TOPIC}',
+  'Pourquoi tu échoues encore avec {TOPIC}',
+  'Ce que les {EXPERTS} de {TOPIC} font différemment',
+  'Le guide {TOPIC} que j\'aurais voulu avoir au départ',
+  '{NB} idées fausses sur {TOPIC} que tout le monde croit',
+  'J\'ai testé {NB} méthodes de {TOPIC}. Voilà la meilleure.',
+  'Le plan en {NB} étapes pour maîtriser {TOPIC} en {TIME}',
+  'Tout ce qu\'on m\'a dit sur {TOPIC} était faux',
+  'Pourquoi {TOPIC} est plus simple que tu ne le penses',
+  '{RESULT} grâce à {TOPIC} : le plan complet',
+  'Ce que personne ne te dit avant de commencer {TOPIC}',
+  'Comment les {EXPERTS} utilisent vraiment {TOPIC}',
+  'Fais ça avec {TOPIC} pendant {TIME} et vois la différence',
+];
+
+function fillSlots(template, d, topic) {
+  return template
+    .replace(/{TOPIC}/g, topic)
+    .replace(/{EXPERTS}/g, rnd(d.experts))
+    .replace(/{PROBLEM}/g, rnd(d.problems))
+    .replace(/{SOLUTION}/g, rnd(d.solutions))
+    .replace(/{RESULT}/g, rnd(d.results))
+    .replace(/{TIME}/g, rnd(d.time))
+    .replace(/{NB}/g, rnd(['3', '5', '7', '10', '73%', '90%']))
+    .replace(/{LOSS}/g, rnd(d.loss))
+    ;
+}
+
+// ─── SCORING ─────────────────────────────────────────────────────
+function scoreScript(hook, body, cta) {
+  // Hook Power (0–30)
+  const powerWords = ['secret','personne','jamais','arrête','stop','attention','erreur','faux','gratuit','rapide','caché','interdit','choc','incroyable','urgent','maintenant','unique','prouvé','vrai','wait','attends'];
+  let hookScore = 0;
+  powerWords.forEach(w => { if (hook.toLowerCase().includes(w)) hookScore += 3; });
+  if (/\d/.test(hook)) hookScore += 5;
+  if (hook.includes('…') || hook.includes('...')) hookScore += 5;
+  if (hook.length >= 20 && hook.length <= 80) hookScore += 5;
+  if (/^(stop|attends|wait|⚠|🚨|🔥)/i.test(hook)) hookScore += 4;
+  hookScore = Math.min(30, Math.max(0, hookScore));
+
+  // Emotion (0–25)
+  const emoWords = ['peur','choc','secret','fou','impossible','perdu','gagné','transformé','changé','révèle','prouvé','scientifique','stratégie','libre','riche','puissant'];
+  let emoScore = 4;
+  emoWords.forEach(w => { if ((hook+body).toLowerCase().includes(w)) emoScore += 2; });
+  emoScore = Math.min(25, emoScore);
+
+  // Structure (0–25)
+  let strScore = 5;
+  if (/①|②|③|Étape|étape|[1-3]\.|•/.test(body)) strScore += 10;
+  const wc = body.trim().split(/\s+/).length;
+  if (wc >= 30 && wc <= 120) strScore += 8;
+  if (/j'ai|j'avais|mon|ma\s/i.test(body)) strScore += 4;
+  strScore = Math.min(25, strScore);
+
+  // CTA (0–20)
+  let ctaScore = 0;
+  if (/commente/i.test(cta)) ctaScore += 8;
+  if (/suis|abonne|follow/i.test(cta)) ctaScore += 6;
+  if (/sauvegarde|enregistre/i.test(cta)) ctaScore += 6;
+  if (/partage|tag|envoie/i.test(cta)) ctaScore += 5;
+  if (/gratuit|plan|guide|complet/i.test(cta)) ctaScore += 5;
+  ctaScore = Math.min(20, ctaScore);
+
+  const total = Math.min(100, hookScore + emoScore + strScore + ctaScore);
+  const label = total >= 80 ? '🔥 Viral' : total >= 65 ? '✅ Solide' : total >= 45 ? '⚠️ Moyen' : '❌ Faible';
+
+  const suggestions = [];
+  if (hookScore < 20) suggestions.push('Ajoute un chiffre ou un mot-choc dans le hook (ex: "3 erreurs", "personne ne sait ça")');
+  if (emoScore < 15) suggestions.push('Utilise un mot émotionnel fort : secret / choc / interdit / impossible');
+  if (strScore < 15) suggestions.push('Structure le script en 3 étapes numérotées pour garder l\'attention');
+  if (ctaScore < 10) suggestions.push('Demande de commenter avec un mot-clé spécifique (ex: "Commente GUIDE")');
+  if (hook.length > 90) suggestions.push('Raccourcis ton hook : moins de 80 caractères pour le 0–3 secondes');
+
+  return { total, breakdown: { hook: hookScore, emotion: emoScore, structure: strScore, cta: ctaScore }, label, suggestions };
+}
+
+// ─── GENERATORS ──────────────────────────────────────────────────
+function generateScript(topic, format, hookType) {
+  const nk = detectNiche(topic);
+  const d = NICHES[nk];
+  const hook = fillSlots(rnd(HOOKS[hookType] || HOOKS.curiosity), d, topic);
+  const body = (BODIES[format] || BODIES.storytelling)(d, topic);
+  const cta = fillSlots(rnd(CTAS), d, topic);
+  const score = scoreScript(hook, body, cta);
+  return { hook, body, cta, score, niche: nk };
+}
+
+function generateIdeas(topic, style = 'mixed') {
+  const nk = detectNiche(topic);
+  const d = NICHES[nk];
+  let templates = [...IDEA_TEMPLATES];
+  if (style === 'numbers') templates = templates.filter(t => t.includes('{NB}'));
+  if (style === 'curiosity') templates = templates.filter(t => /vérité|personne|faux|caché|vraiment/i.test(t));
+  if (style === 'story') templates = templates.filter(t => /j'ai|comment|m'a/i.test(t));
+
+  const shuffled = [...templates].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 12).map(t => fillSlots(t, d, topic));
+}
+
+// ─── BACKEND CALLER ──────────────────────────────────────────────
+let backendAvailable = false;
+const getBackendUrl = () => document.getElementById('backend-url').value.trim();
+const getApiKey = () => document.getElementById('api-key-input').value.trim();
+
+async function checkBackend() {
+  try {
+    const r = await fetch(getBackendUrl() + '/health', { signal: AbortSignal.timeout(2000) });
+    backendAvailable = r.ok;
+  } catch {
+    backendAvailable = false;
+  }
+  document.getElementById('status-dot').className = 'status-dot' + (backendAvailable ? ' online' : '');
+  document.getElementById('status-text').textContent = backendAvailable ? 'Claude AI' : 'templates';
+}
+
+async function apiGenerate(endpoint, body) {
+  if (!backendAvailable) return null;
+  try {
+    const r = await fetch(getBackendUrl() + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, api_key: getApiKey() }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+// ─── COPY HELPER ─────────────────────────────────────────────────
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copié';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⎘ Copier'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+function makeCard(label, labelClass, content, extra = '') {
+  const id = 'card-' + Math.random().toString(36).slice(2,8);
+  return `<div class="output-card">
+    <div class="output-card-header">
+      <span class="output-card-label ${labelClass}">${label}</span>
+      ${extra}
+      <button class="copy-btn" onclick="copyToClipboard(document.getElementById('${id}').textContent, this)">⎘ Copier</button>
+    </div>
+    <div class="output-card-body" id="${id}">${escHtml(content)}</div>
+  </div>`;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function makeScoreHtml(score) {
+  const getDimClass = v => v >= 20 ? 'high' : v >= 12 ? 'mid' : 'low';
+  const dimMax = { hook: 30, emotion: 25, structure: 25, cta: 20 };
+  const dimLabel = { hook: 'Hook', emotion: 'Émotion', structure: 'Structure', cta: 'CTA' };
+  return `<div class="score-card">
+    <div class="score-header">
+      <div>
+        <div class="score-total">${score.total}</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:2px;">/100</div>
+      </div>
+      <div class="score-label">${score.label}</div>
+    </div>
+    <div class="score-bar-wrap">
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:${score.total}%"></div></div>
+    </div>
+    <div class="score-dimensions">
+      ${Object.entries(score.breakdown).map(([k,v]) => `
+        <div class="score-dim">
+          <div class="score-dim-label">${dimLabel[k]} <span style="color:var(--dim2)">(/${dimMax[k]})</span></div>
+          <div class="score-dim-val ${getDimClass(v)}">${v}</div>
+        </div>`).join('')}
+    </div>
+    ${score.suggestions.length ? `<div class="score-suggestions">
+      ${score.suggestions.map(s => `<div class="score-suggestion">💡 ${escHtml(s)}</div>`).join('')}
+    </div>` : '<div style="color:var(--green);font-size:12px;">✅ Script optimisé — prêt à poster !</div>'}
+  </div>`;
+}
+
+// ─── SCRIPT TAB ──────────────────────────────────────────────────
+let currentScript = null;
+let selectedFormat = 'storytelling';
+let selectedHook = 'curiosity';
+let selectedPlatform = 'tiktok';
+
+function renderScriptOutput(data) {
+  const niche = NICHES[data.niche];
+  const platformNote = { tiktok:'15–60 sec', shorts:'< 60 sec', reels:'< 90 sec' }[selectedPlatform] || '';
+  document.getElementById('script-output').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span class="niche-badge">${niche.emoji} ${niche.name}</span>
+      ${platformNote ? `<span style="font-size:11px;color:var(--dim2);">📱 ${selectedPlatform} · ${platformNote}</span>` : ''}
+    </div>
+    ${makeCard('🎣 HOOK (0–3 sec)', 'hook', data.hook)}
+    ${makeCard('📝 SCRIPT', 'script', data.body)}
+    ${makeCard('📣 CALL TO ACTION', 'cta', data.cta)}
+    <div class="regen-row">
+      <button class="btn-secondary" id="regen-btn">↺ Regénérer</button>
+      <button class="btn-secondary" id="copy-all-btn">⎘ Tout copier</button>
+    </div>
+    ${makeScoreHtml(data.score)}
+  `;
+  document.getElementById('regen-btn').onclick = () => doGenerateScript(true);
+  document.getElementById('copy-all-btn').onclick = function() {
+    const all = `HOOK:\n${data.hook}\n\nSCRIPT:\n${data.body}\n\nCTA:\n${data.cta}`;
+    copyToClipboard(all, this);
+  };
+}
+
+async function doGenerateScript(regen = false) {
+  const topic = document.getElementById('script-topic').value.trim();
+  if (!topic) { document.getElementById('script-topic').focus(); return; }
+  const btn = document.getElementById('generate-script-btn');
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Génération…';
+
+  // Try backend first
+  let data = await apiGenerate('/api/script', { topic, format: selectedFormat, hook_type: selectedHook });
+  if (!data) {
+    data = generateScript(topic, selectedFormat, selectedHook);
+  }
+  currentScript = data;
+  renderScriptOutput(data);
+  btn.classList.remove('loading');
+  btn.textContent = '▶ Générer le Script';
+}
+
+document.getElementById('generate-script-btn').onclick = () => doGenerateScript();
+
+// Format/hook/platform chips
+document.querySelectorAll('#format-chips .chip').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('#format-chips .chip').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedFormat = c.dataset.val;
+  };
+});
+document.querySelectorAll('#hook-chips .chip').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('#hook-chips .chip').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedHook = c.dataset.val;
+  };
+});
+document.querySelectorAll('#platform-chips .chip').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('#platform-chips .chip').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedPlatform = c.dataset.val;
+  };
+});
+
+document.querySelectorAll('.example-chip').forEach(c => {
+  c.onclick = () => {
+    document.getElementById('script-topic').value = c.dataset.topic;
+    doGenerateScript();
+  };
+});
+
+document.getElementById('script-topic').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doGenerateScript();
+});
+
+// ─── IDEAS TAB ───────────────────────────────────────────────────
+let selectedIdeasStyle = 'mixed';
+
+document.querySelectorAll('#ideas-style-chips .chip').forEach(c => {
+  c.onclick = () => {
+    document.querySelectorAll('#ideas-style-chips .chip').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    selectedIdeasStyle = c.dataset.val;
+  };
+});
+
+async function doGenerateIdeas() {
+  const topic = document.getElementById('ideas-topic').value.trim();
+  if (!topic) { document.getElementById('ideas-topic').focus(); return; }
+  const btn = document.getElementById('generate-ideas-btn');
+  btn.classList.add('loading'); btn.textContent = '⏳ Génération…';
+
+  let ideas = null;
+  const res = await apiGenerate('/api/ideas', { topic, style: selectedIdeasStyle });
+  if (res && res.ideas) ideas = res.ideas;
+  else ideas = generateIdeas(topic, selectedIdeasStyle);
+
+  const nk = detectNiche(topic);
+  const niche = NICHES[nk];
+  const html = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <span class="niche-badge">${niche.emoji} ${niche.name}</span>
+      <span style="font-size:11px;color:var(--dim2);">${ideas.length} idées générées</span>
+    </div>
+    <div class="ideas-grid">
+      ${ideas.map((idea, i) => `
+        <div class="idea-card">
+          <div>
+            <div class="idea-rank">#${i+1}</div>
+            <div class="idea-text">${escHtml(idea)}</div>
+          </div>
+          <button class="copy-btn" onclick="copyToClipboard('${idea.replace(/'/g,"\\'")}', this)" style="flex-shrink:0;align-self:flex-start;">⎘</button>
+        </div>
+      `).join('')}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-secondary" onclick="doGenerateIdeas()">↺ Regénérer</button>
+      <button class="btn-secondary" onclick="copyToClipboard(\`${ideas.join('\\n')}\`, this)">⎘ Tout copier</button>
+    </div>
+  `;
+  document.getElementById('ideas-output').innerHTML = html;
+  btn.classList.remove('loading'); btn.textContent = '▶ Générer 12 Idées';
+}
+
+document.getElementById('generate-ideas-btn').onclick = doGenerateIdeas;
+document.getElementById('ideas-topic').addEventListener('keydown', e => { if(e.key==='Enter') doGenerateIdeas(); });
+document.querySelectorAll('.example-ideas').forEach(c => {
+  c.onclick = () => { document.getElementById('ideas-topic').value = c.dataset.topic; doGenerateIdeas(); };
+});
+
+// ─── SCORER TAB ──────────────────────────────────────────────────
+async function doScore() {
+  const hook = document.getElementById('score-hook').value.trim();
+  const body = document.getElementById('score-body').value.trim();
+  const cta = document.getElementById('score-cta').value.trim();
+  if (!hook && !body) return;
+
+  let score = null;
+  const res = await apiGenerate('/api/score', { hook, body, cta });
+  if (res && res.total !== undefined) score = res;
+  else score = scoreScript(hook, body, cta);
+
+  document.getElementById('scorer-output').innerHTML = `
+    ${makeScoreHtml(score)}
+    <div class="output-card">
+      <div class="output-card-header">
+        <span class="output-card-label hook">📝 ANALYSE DÉTAILLÉE</span>
+      </div>
+      <div class="output-card-body" style="font-size:12px;color:var(--dim);line-height:1.7;">
+Hook analysé : "${escHtml(hook.slice(0,80))}${hook.length>80?'…':''}"
+Score total : ${score.total}/100 — ${score.label}
+
+Dimensions :
+• Hook Power : ${score.breakdown.hook}/30
+• Émotion : ${score.breakdown.emotion}/25
+• Structure : ${score.breakdown.structure}/25
+• CTA : ${score.breakdown.cta}/20
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById('score-btn').onclick = doScore;
+
+// ─── VIDEO TAB ───────────────────────────────────────────────────
+document.getElementById('gen-ffmpeg-btn').onclick = () => {
+  const src = document.getElementById('video-source').value.trim() || 'video.mp4';
+  const segsRaw = document.getElementById('video-segments').value.trim();
+  const segments = segsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+  const base = src.replace(/\.[^.]+$/, '');
+
+  const cmds = segments.map((seg, i) => {
+    const [start, end] = seg.split('-').map(s => s.trim());
+    const duration = end && start ? parseFloat(end) - parseFloat(start) : '';
+    return `# Short ${i+1} (${seg}s)\nffmpeg -i "${src}" -ss ${start} ${duration ? `-t ${duration}` : `-to ${end}`} -c:v libx264 -c:a aac -movflags +faststart "${base}_short_${i+1}.mp4"`;
+  }).join('\n\n');
+
+  document.getElementById('ffmpeg-commands').innerHTML = `
+    <div class="code-block">${escHtml(cmds)}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;">
+      <button class="btn-secondary" onclick="copyToClipboard(\`${cmds.replace(/`/g,'\\`')}\`, this)">⎘ Copier tout</button>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--dim2);">
+      💡 Astuce : ajoute <code style="color:var(--blue);">-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1"</code> pour forcer le format vertical 9:16
+    </div>
+  `;
+};
+
+document.getElementById('auto-cut-btn').onclick = async () => {
+  const url = document.getElementById('yt-url').value.trim();
+  if (!url) return;
+  const el = document.getElementById('auto-cut-result');
+  if (!backendAvailable) {
+    el.innerHTML = '<div style="color:var(--yellow);font-size:12px;">⚠️ Lance server.py pour activer la découpe automatique</div>';
+    return;
+  }
+  el.innerHTML = '<div style="color:var(--dim);font-size:12px;">⏳ Téléchargement + analyse…</div>';
+  const res = await apiGenerate('/api/video', { url, api_key: getApiKey() });
+  if (res && res.segments) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--green);">✅ ${res.segments.length} segments détectés</div>`;
+  } else {
+    el.innerHTML = '<div style="color:var(--red);font-size:12px;">❌ Erreur — vérifie server.py et l\'URL</div>';
+  }
+};
+
+// ─── TABS ────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  };
+});
+
+// ─── SETTINGS ────────────────────────────────────────────────────
+document.getElementById('settings-toggle').onclick = () => {
+  document.getElementById('settings-panel').classList.toggle('open');
+};
+document.getElementById('test-backend').onclick = async () => {
+  const btn = document.getElementById('test-backend');
+  btn.textContent = '⏳ Test…';
+  await checkBackend();
+  btn.textContent = backendAvailable ? '✅ Connecté' : '❌ Hors ligne';
+  setTimeout(() => { btn.textContent = 'Tester connexion'; }, 2500);
+};
+
+// ─── INIT ────────────────────────────────────────────────────────
+checkBackend();
+setInterval(checkBackend, 30000);
+</script>
+</body>
+</html>

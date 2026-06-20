@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Video temp files
+creator-engine/tmp/
+/tmp/creator_engine/
+*.mp4
+*.mkv
+*.webm
+*.part
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
