@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CausalStudio v1</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --text: #c9d1d9;
+    --dim: #8b949e;
+    --input-bg: #1f2428;
+    --red: #f85149;
+    --yellow: #d29922;
+  }
+
+  html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; overflow: hidden; }
+
+  #app { display: grid; grid-template-columns: 1fr 280px; grid-template-rows: auto 1fr auto; height: 100vh; gap: 0; }
+
+  /* HEADER */
+  #header {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  #logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+  #logo span { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  #speed-badge {
+    margin-left: auto;
+    font-size: 12px; color: var(--dim);
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 8px;
+  }
+  #pause-btn {
+    background: var(--input-bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px;
+  }
+  #pause-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* CANVAS AREA */
+  #canvas-wrap {
+    position: relative;
+    background: #090e14;
+    overflow: hidden;
+  }
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  /* OVERLAY when paused */
+  #paused-overlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5);
+    align-items: center; justify-content: center;
+    font-size: 32px; font-weight: 700; color: var(--accent);
+    letter-spacing: 4px;
+  }
+  #paused-overlay.visible { display: flex; }
+
+  /* SIDEBAR */
+  #sidebar {
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .panel-section {
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--dim); margin-bottom: 8px;
+  }
+
+  /* STRUCTURE PANEL */
+  #structure-list {
+    font-size: 12px; line-height: 1.7;
+    min-height: 40px;
+    color: var(--text);
+  }
+  .struct-item { display: flex; align-items: center; gap: 6px; }
+  .struct-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* MEMORY PANEL */
+  #memory-list {
+    flex: 1; overflow-y: auto; padding: 12px;
+    font-size: 11px; font-family: 'Consolas', monospace;
+    line-height: 1.6;
+  }
+  .mem-obj { margin-bottom: 8px; }
+  .mem-id { color: var(--accent); }
+  .mem-detail { color: var(--dim); padding-left: 8px; }
+  .mem-beh { color: var(--accent2); }
+
+  /* FOOTER INPUT */
+  #footer {
+    grid-column: 1 / -1;
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  #prompt-prefix { color: var(--accent); font-weight: 700; font-size: 16px; }
+  #input {
+    flex: 1;
+    background: var(--input-bg); border: 1px solid var(--border);
+    color: var(--text); font-size: 14px;
+    border-radius: 6px; padding: 8px 12px;
+    outline: none; transition: border-color 0.15s;
+  }
+  #input:focus { border-color: var(--accent); }
+  #input::placeholder { color: var(--dim); }
+  #send-btn {
+    background: var(--accent); border: none; color: #000;
+    font-size: 13px; font-weight: 600;
+    border-radius: 6px; padding: 8px 18px; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #send-btn:hover { opacity: 0.85; }
+
+  /* FEEDBACK */
+  #feedback {
+    position: absolute;
+    bottom: 60px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 16px;
+    font-size: 13px; color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  #feedback.show { opacity: 1; }
+  #feedback.ok { border-color: var(--accent2); color: var(--accent2); }
+  #feedback.err { border-color: var(--red); color: var(--red); }
+  #feedback.warn { border-color: var(--yellow); color: var(--yellow); }
+
+  /* HINT PILLS */
+  #hints {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 0 16px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    grid-column: 1 / -1;
+  }
+  .hint-pill {
+    background: var(--input-bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px;
+    font-size: 11px; color: var(--dim);
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+    user-select: none;
+  }
+  .hint-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  #count-badge {
+    margin-left: 4px; font-size: 10px; color: var(--dim);
+    background: var(--bg); border-radius: 10px; padding: 1px 6px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <header id="header">
+    <div id="logo">CAUSAL<span>STUDIO</span> <span style="color:var(--accent2);font-size:11px;font-weight:600;">v1</span></div>
+    <div id="speed-badge">vitesse: <b id="speed-val">1.0×</b></div>
+    <button id="pause-btn">⏸ pause</button>
+  </header>
+
+  <!-- HINT PILLS -->
+  <div id="hints">
+    <span class="hint-pill" data-cmd="un cercle bleu">un cercle bleu</span>
+    <span class="hint-pill" data-cmd="un carré rouge">un carré rouge</span>
+    <span class="hint-pill" data-cmd="un triangle vert">un triangle vert</span>
+    <span class="hint-pill" data-cmd="le cercle bleu suit le carré rouge">cercle suit carré</span>
+    <span class="hint-pill" data-cmd="le carré rouge fuit le cercle bleu">carré fuit cercle</span>
+    <span class="hint-pill" data-cmd="le triangle tourne autour du cercle">tourne autour</span>
+    <span class="hint-pill" data-cmd="ajoute un obstacle">obstacle</span>
+    <span class="hint-pill" data-cmd="accélère">accélère</span>
+    <span class="hint-pill" data-cmd="ralentis">ralentis</span>
+    <span class="hint-pill" data-cmd="efface tout">efface tout</span>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div id="paused-overlay">PAUSE</div>
+    <div id="feedback"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="panel-section">
+      <div class="panel-title">Structure <span id="count-badge">0 obj</span></div>
+      <div id="structure-list"><span style="color:var(--dim);font-size:11px;">aucun objet</span></div>
+    </div>
+    <div class="panel-title" style="padding:12px 12px 0;">Mémoire</div>
+    <div id="memory-list"></div>
+  </aside>
+
+  <!-- FOOTER -->
+  <footer id="footer">
+    <span id="prompt-prefix">&gt;</span>
+    <input id="input" type="text" placeholder="un cercle rouge / le carré suit le cercle / efface tout..." autocomplete="off" spellcheck="false" />
+    <button id="send-btn">Envoyer</button>
+  </footer>
+</div>
+
+<script type="module">
+import { parse, COLOR_MAP, SHAPE_MAP } from './parser.js';
+import { WorldState, createObject, createObstacle } from './state.js';
+import { step } from './engine.js';
+
+// ─── SETUP ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send-btn');
+const feedbackEl = document.getElementById('feedback');
+const pauseBtn = document.getElementById('pause-btn');
+const speedVal = document.getElementById('speed-val');
+const pausedOverlay = document.getElementById('paused-overlay');
+const structureList = document.getElementById('structure-list');
+const memoryList = document.getElementById('memory-list');
+const countBadge = document.getElementById('count-badge');
+
+const world = new WorldState();
+
+function resize() {
+  canvas.width = canvasWrap.offsetWidth;
+  canvas.height = canvasWrap.offsetHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── FEEDBACK ────────────────────────────────────────────────────────────────
+let feedbackTimer;
+function showFeedback(msg, type = 'ok') {
+  feedbackEl.textContent = msg;
+  feedbackEl.className = `show ${type}`;
+  clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => { feedbackEl.className = ''; }, 2200);
+}
+
+// ─── COMMAND HANDLER ─────────────────────────────────────────────────────────
+function handleCommand(text) {
+  if (!text.trim()) return;
+  const intent = parse(text, world.objects);
+
+  switch (intent.type) {
+    case 'CREATE': {
+      for (let i = 0; i < (intent.quantity || 1); i++) {
+        const obj = createObject({ shape: intent.shape, color: intent.color });
+        world.add(obj);
+      }
+      const n = intent.quantity || 1;
+      showFeedback(`✓ ${n > 1 ? n + ' ' : ''}${intent.shape}(s) créé(s)`, 'ok');
+      break;
+    }
+    case 'ADD_OBSTACLE': {
+      world.addObstacle(createObstacle());
+      showFeedback('✓ obstacle ajouté', 'ok');
+      break;
+    }
+    case 'DESTROY': {
+      const targets = world.findByShapeColor(intent.shape, intent.color);
+      if (targets.length === 0) {
+        showFeedback('⚠ aucun objet trouvé', 'warn');
+      } else {
+        targets.forEach(o => world.remove(o.id));
+        showFeedback(`✓ ${targets.length} objet(s) supprimé(s)`, 'ok');
+      }
+      break;
+    }
+    case 'SET_BEHAVIOR': {
+      const subj = intent.subject;
+      const candidates = world.findByShapeColor(subj.shape, subj.color ? colorNameToHex(subj.color) : null);
+      if (candidates.length === 0) {
+        showFeedback('⚠ objet source non trouvé', 'warn');
+        break;
+      }
+      let targetObj = null;
+      if (intent.target) {
+        const t = intent.target;
+        const tCandidates = world.findByShapeColor(t.shape, t.color ? colorNameToHex(t.color) : null);
+        targetObj = tCandidates[0] || null;
+      }
+      candidates.forEach(o => {
+        o.behavior = intent.behavior;
+        o.targetId = targetObj ? targetObj.id : null;
+      });
+      const behaviorLabel = { seek: 'suit', flee: 'fuit', orbit: 'tourne autour de', wander: 'erre' }[intent.behavior] || intent.behavior;
+      showFeedback(`✓ ${candidates.length} objet(s) → ${behaviorLabel}${targetObj ? ' ' + targetObj.shape : ''}`, 'ok');
+      break;
+    }
+    case 'CLEAR_ALL': {
+      world.clear();
+      showFeedback('✓ monde effacé', 'ok');
+      break;
+    }
+    case 'PAUSE': {
+      world.paused = true;
+      pauseBtn.textContent = '▶ reprendre';
+      pausedOverlay.classList.add('visible');
+      showFeedback('⏸ pause', 'warn');
+      break;
+    }
+    case 'RESUME': {
+      world.paused = false;
+      pauseBtn.textContent = '⏸ pause';
+      pausedOverlay.classList.remove('visible');
+      showFeedback('▶ repris', 'ok');
+      break;
+    }
+    case 'SPEED': {
+      world.speed = Math.max(0.1, Math.min(5, world.speed + intent.delta));
+      speedVal.textContent = world.speed.toFixed(1) + '×';
+      showFeedback(`✓ vitesse ${world.speed.toFixed(1)}×`, 'ok');
+      break;
+    }
+    default:
+      showFeedback('⚠ commande non reconnue', 'err');
+  }
+}
+
+function colorNameToHex(name) {
+  return COLOR_MAP[name] || name;
+}
+
+// ─── INPUT EVENTS ─────────────────────────────────────────────────────────────
+sendBtn.addEventListener('click', () => {
+  handleCommand(input.value);
+  input.value = '';
+});
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    handleCommand(input.value);
+    input.value = '';
+  }
+});
+
+pauseBtn.addEventListener('click', () => {
+  if (world.paused) handleCommand('reprends');
+  else handleCommand('pause');
+});
+
+document.querySelectorAll('.hint-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    handleCommand(pill.dataset.cmd);
+  });
+});
+
+// ─── RENDERER ─────────────────────────────────────────────────────────────────
+function drawShape(ctx, shape, x, y, r, color, alpha = 1) {
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  switch (shape) {
+    case 'circle':
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      break;
+    case 'square': {
+      const s = r * 1.5;
+      ctx.rect(x - s / 2, y - s / 2, s, s);
+      break;
+    }
+    case 'triangle': {
+      const h = r * 1.8;
+      ctx.moveTo(x, y - h / 2);
+      ctx.lineTo(x + h * 0.6, y + h / 2);
+      ctx.lineTo(x - h * 0.6, y + h / 2);
+      ctx.closePath();
+      break;
+    }
+    case 'star': {
+      const spikes = 5;
+      const outer = r * 1.4;
+      const inner = r * 0.6;
+      let rot = (Math.PI / 2) * 3;
+      const step = Math.PI / spikes;
+      ctx.moveTo(x, y - outer);
+      for (let i = 0; i < spikes; i++) {
+        ctx.lineTo(x + Math.cos(rot) * outer, y + Math.sin(rot) * outer);
+        rot += step;
+        ctx.lineTo(x + Math.cos(rot) * inner, y + Math.sin(rot) * inner);
+        rot += step;
+      }
+      ctx.closePath();
+      break;
+    }
+    case 'diamond': {
+      ctx.moveTo(x, y - r * 1.5);
+      ctx.lineTo(x + r, y);
+      ctx.lineTo(x, y + r * 1.5);
+      ctx.lineTo(x - r, y);
+      ctx.closePath();
+      break;
+    }
+    default:
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+
+  ctx.fill();
+  ctx.globalAlpha = alpha * 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawTrail(ctx, trail, color) {
+  if (trail.length < 2) return;
+  for (let i = 1; i < trail.length; i++) {
+    const a = (i / trail.length) * 0.35;
+    ctx.beginPath();
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+    ctx.lineTo(trail[i].x, trail[i].y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawRelation(ctx, a, b, behavior) {
+  const colors = { seek: '#3fb950', flee: '#f85149', orbit: '#58a6ff' };
+  const c = colors[behavior] || '#8b949e';
+  ctx.beginPath();
+  ctx.setLineDash([4, 6]);
+  ctx.globalAlpha = 0.3;
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1;
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+function drawObstacle(ctx, obs) {
+  ctx.fillStyle = obs.color;
+  ctx.globalAlpha = 0.55;
+  ctx.fillRect(obs.x - obs.w / 2, obs.y - obs.h / 2, obs.w, obs.h);
+  ctx.globalAlpha = 0.8;
+  ctx.strokeStyle = '#8b949e';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(obs.x - obs.w / 2, obs.y - obs.h / 2, obs.w, obs.h);
+  ctx.globalAlpha = 1;
+}
+
+function render() {
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#1a2030';
+  ctx.lineWidth = 1;
+  const gs = 40;
+  for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Obstacles
+  for (const obs of Object.values(world.obstacles)) drawObstacle(ctx, obs);
+
+  // Relation lines
+  for (const obj of Object.values(world.objects)) {
+    if (obj.targetId && world.objects[obj.targetId]) {
+      drawRelation(ctx, obj, world.objects[obj.targetId], obj.behavior);
+    }
+  }
+
+  // Objects
+  for (const obj of Object.values(world.objects)) {
+    drawTrail(ctx, obj.trail, obj.color);
+    drawShape(ctx, obj.shape, obj.x, obj.y, obj.radius, obj.color);
+  }
+}
+
+// ─── UI PANELS ────────────────────────────────────────────────────────────────
+const SHAPE_LABELS = { circle: 'cercle', square: 'carré', triangle: 'triangle', star: 'étoile', diamond: 'losange' };
+const BEH_LABELS = { seek: 'suit', flee: 'fuit', orbit: 'orbite', wander: 'erre' };
+
+function updatePanels() {
+  const objs = Object.values(world.objects);
+  countBadge.textContent = `${objs.length} obj` + (Object.keys(world.obstacles).length ? ` + ${Object.keys(world.obstacles).length} obs` : '');
+
+  // Structure
+  if (objs.length === 0) {
+    structureList.innerHTML = '<span style="color:var(--dim);font-size:11px;">aucun objet</span>';
+  } else {
+    structureList.innerHTML = objs.map(o => `
+      <div class="struct-item">
+        <div class="struct-dot" style="background:${o.color};"></div>
+        <span>${SHAPE_LABELS[o.shape] || o.shape}</span>
+        <span style="color:var(--dim);font-size:10px;margin-left:auto;">${BEH_LABELS[o.behavior] || o.behavior}</span>
+      </div>
+    `).join('');
+  }
+
+  // Memory
+  if (objs.length === 0) {
+    memoryList.innerHTML = '<span style="color:var(--dim);">— vide —</span>';
+  } else {
+    memoryList.innerHTML = objs.map(o => {
+      const target = o.targetId && world.objects[o.targetId];
+      const targetStr = target ? ` → ${SHAPE_LABELS[target.shape] || target.shape}` : '';
+      return `<div class="mem-obj">
+        <div><span class="mem-id">${o.id}</span></div>
+        <div class="mem-detail">shape: ${SHAPE_LABELS[o.shape] || o.shape}</div>
+        <div class="mem-detail">color: <span style="color:${o.color}">■</span> ${o.color}</div>
+        <div class="mem-detail"><span class="mem-beh">${BEH_LABELS[o.behavior] || o.behavior}</span>${targetStr}</div>
+        <div class="mem-detail">pos: (${Math.round(o.x)}, ${Math.round(o.y)})</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+let frame = 0;
+function loop() {
+  step(world, canvas.width, canvas.height);
+  render();
+  if (frame % 6 === 0) updatePanels();
+  frame++;
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
