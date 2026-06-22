@@ -201,16 +201,18 @@
 
   <!-- HINT PILLS -->
   <div id="hints">
-    <span class="hint-pill" data-cmd="un cercle bleu">un cercle bleu</span>
-    <span class="hint-pill" data-cmd="un carré rouge">un carré rouge</span>
-    <span class="hint-pill" data-cmd="un triangle vert">un triangle vert</span>
-    <span class="hint-pill" data-cmd="le cercle bleu suit le carré rouge">cercle suit carré</span>
-    <span class="hint-pill" data-cmd="le carré rouge fuit le cercle bleu">carré fuit cercle</span>
-    <span class="hint-pill" data-cmd="le triangle tourne autour du cercle">tourne autour</span>
+    <span class="hint-pill" data-cmd="scène aléatoire">✨ scène</span>
+    <span class="hint-pill" data-cmd="essaim de cercles">🐦 essaim</span>
+    <span class="hint-pill" data-cmd="vortex">🌀 vortex</span>
+    <span class="hint-pill" data-cmd="explosion">💥 explosion</span>
+    <span class="hint-pill" data-cmd="un cercle bleu">cercle bleu</span>
+    <span class="hint-pill" data-cmd="un carré rouge">carré rouge</span>
+    <span class="hint-pill" data-cmd="le cercle bleu suit le carré rouge">suit</span>
+    <span class="hint-pill" data-cmd="le carré rouge fuit le cercle bleu">fuit</span>
+    <span class="hint-pill" data-cmd="le triangle tourne autour du cercle">orbite</span>
     <span class="hint-pill" data-cmd="ajoute un obstacle">obstacle</span>
-    <span class="hint-pill" data-cmd="accélère">accélère</span>
-    <span class="hint-pill" data-cmd="ralentis">ralentis</span>
-    <span class="hint-pill" data-cmd="efface tout">efface tout</span>
+    <span class="hint-pill" data-cmd="accélère">+ vite</span>
+    <span class="hint-pill" data-cmd="efface tout">reset</span>
   </div>
 
   <!-- CANVAS -->
@@ -240,7 +242,7 @@
 
 <script type="module">
 import { parse, COLOR_MAP, SHAPE_MAP } from './parser.js';
-import { WorldState, createObject, createObstacle } from './state.js';
+import { WorldState, createObject, createObstacle, createGravityWell, createFlock } from './state.js';
 import { step } from './engine.js';
 
 // ─── SETUP ───────────────────────────────────────────────────────────────────
@@ -326,6 +328,63 @@ function handleCommand(text) {
       showFeedback(`✓ ${candidates.length} objet(s) → ${behaviorLabel}${targetObj ? ' ' + targetObj.shape : ''}`, 'ok');
       break;
     }
+    case 'CREATE_FLOCK': {
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      const flocks = createFlock(intent.quantity || 12, intent.shape, intent.color, cx, cy);
+      flocks.forEach(obj => { world.add(obj); world.addBurst(obj.x, obj.y, obj.color); });
+      showFeedback(`✓ essaim de ${flocks.length} créé`, 'ok');
+      break;
+    }
+    case 'ADD_GRAVITY_WELL': {
+      const well = createGravityWell({
+        x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+        y: canvas.height / 2 + (Math.random() - 0.5) * 150,
+        repel: intent.repel,
+      });
+      world.addGravityWell(well);
+      showFeedback(`✓ ${intent.repel ? 'répulseur' : 'vortex'} ajouté`, 'ok');
+      break;
+    }
+    case 'SET_PULSE': {
+      const targets = world.findByShapeColor(intent.shape, intent.color ? colorNameToHex(intent.color) : null);
+      if (targets.length === 0) { showFeedback('⚠ aucun objet trouvé', 'warn'); break; }
+      targets.forEach(o => { o.pulse = true; });
+      showFeedback(`✓ ${targets.length} objet(s) → pulse`, 'ok');
+      break;
+    }
+    case 'EXPLODE': {
+      const objs = Object.values(world.objects);
+      if (objs.length === 0) { showFeedback('⚠ monde vide', 'warn'); break; }
+      objs.forEach(obj => {
+        const angle = Math.random() * Math.PI * 2;
+        const force = 4 + Math.random() * 5;
+        obj.vx = Math.cos(angle) * force;
+        obj.vy = Math.sin(angle) * force;
+        world.addBurst(obj.x, obj.y, obj.color);
+      });
+      showFeedback('💥 explosion !', 'ok');
+      break;
+    }
+    case 'RANDOM_SCENE': {
+      world.clear();
+      const W = canvas.width, H = canvas.height;
+      world.addGravityWell(createGravityWell({ x: W / 2, y: H / 2, strength: 80, color: '#9b59b6' }));
+      const flocks2 = createFlock(14, 'circle', '#3498db', W / 2, H / 2);
+      flocks2.forEach(obj => { world.add(obj); world.addBurst(obj.x, obj.y, obj.color); });
+      const solo = [
+        { shape: 'triangle', color: '#e74c3c' },
+        { shape: 'star', color: '#f1c40f' },
+        { shape: 'diamond', color: '#2ecc71' },
+      ];
+      solo.forEach(({ shape, color }) => {
+        const obj = createObject({ shape, color });
+        obj.behavior = 'wander';
+        world.add(obj);
+        world.addBurst(obj.x, obj.y, color);
+      });
+      showFeedback('✨ scène générée', 'ok');
+      break;
+    }
     case 'CLEAR_ALL': {
       world.clear();
       showFeedback('✓ monde effacé', 'ok');
@@ -384,141 +443,210 @@ document.querySelectorAll('.hint-pill').forEach(pill => {
 });
 
 // ─── RENDERER ─────────────────────────────────────────────────────────────────
-function drawShape(ctx, shape, x, y, r, color, alpha = 1) {
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
 
+function buildPath(ctx, shape, x, y, r) {
+  ctx.beginPath();
   switch (shape) {
     case 'circle':
       ctx.arc(x, y, r, 0, Math.PI * 2);
       break;
-    case 'square': {
-      const s = r * 1.5;
-      ctx.rect(x - s / 2, y - s / 2, s, s);
-      break;
-    }
+    case 'square': { const s = r * 1.5; ctx.rect(x - s/2, y - s/2, s, s); break; }
     case 'triangle': {
       const h = r * 1.8;
-      ctx.moveTo(x, y - h / 2);
-      ctx.lineTo(x + h * 0.6, y + h / 2);
-      ctx.lineTo(x - h * 0.6, y + h / 2);
-      ctx.closePath();
-      break;
+      ctx.moveTo(x, y - h/2);
+      ctx.lineTo(x + h*0.6, y + h/2);
+      ctx.lineTo(x - h*0.6, y + h/2);
+      ctx.closePath(); break;
     }
     case 'star': {
-      const spikes = 5;
-      const outer = r * 1.4;
-      const inner = r * 0.6;
-      let rot = (Math.PI / 2) * 3;
-      const step = Math.PI / spikes;
-      ctx.moveTo(x, y - outer);
-      for (let i = 0; i < spikes; i++) {
-        ctx.lineTo(x + Math.cos(rot) * outer, y + Math.sin(rot) * outer);
-        rot += step;
-        ctx.lineTo(x + Math.cos(rot) * inner, y + Math.sin(rot) * inner);
-        rot += step;
+      const sp = 5, ou = r*1.4, inn = r*0.6;
+      let rot = Math.PI/2*3, stp = Math.PI/sp;
+      ctx.moveTo(x, y - ou);
+      for (let i = 0; i < sp; i++) {
+        ctx.lineTo(x + Math.cos(rot)*ou, y + Math.sin(rot)*ou); rot += stp;
+        ctx.lineTo(x + Math.cos(rot)*inn, y + Math.sin(rot)*inn); rot += stp;
       }
-      ctx.closePath();
-      break;
+      ctx.closePath(); break;
     }
-    case 'diamond': {
-      ctx.moveTo(x, y - r * 1.5);
-      ctx.lineTo(x + r, y);
-      ctx.lineTo(x, y + r * 1.5);
-      ctx.lineTo(x - r, y);
-      ctx.closePath();
-      break;
-    }
+    case 'diamond':
+      ctx.moveTo(x, y-r*1.5); ctx.lineTo(x+r,y); ctx.lineTo(x,y+r*1.5); ctx.lineTo(x-r,y);
+      ctx.closePath(); break;
     default:
       ctx.arc(x, y, r, 0, Math.PI * 2);
   }
+}
 
+function drawShape(ctx, obj) {
+  const { x, y, color, shape, radius, pulse, pulsePhase, speed } = obj;
+  const r = pulse ? radius + Math.sin(pulsePhase) * 5 : radius;
+  const glow = 10 + Math.min(22, (speed || 0) * 4);
+
+  ctx.save();
+  ctx.shadowBlur = glow;
+  ctx.shadowColor = color;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.92;
+  buildPath(ctx, shape, x, y, r);
   ctx.fill();
-  ctx.globalAlpha = alpha * 0.5;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+
+  // Bright core
+  ctx.shadowBlur = glow * 0.4;
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  buildPath(ctx, shape, x, y, r * 0.55);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawTrail(ctx, trail, color) {
   if (trail.length < 2) return;
+  ctx.save();
+  ctx.lineCap = 'round';
   for (let i = 1; i < trail.length; i++) {
-    const a = (i / trail.length) * 0.35;
+    const t = i / trail.length;
     ctx.beginPath();
-    ctx.globalAlpha = a;
+    ctx.globalAlpha = t * t * 0.5;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+    ctx.lineWidth = t * 2.8;
+    ctx.shadowBlur = t * 16;
+    ctx.shadowColor = color;
+    ctx.moveTo(trail[i-1].x, trail[i-1].y);
     ctx.lineTo(trail[i].x, trail[i].y);
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawGravityWell(ctx, well) {
+  const t = Date.now() / 1000;
+  const c = well.repel ? '#e74c3c' : '#9b59b6';
+  ctx.save();
+  for (let ring = 3; ring >= 1; ring--) {
+    const r = 18 + ring * 24 + Math.sin(t * 1.8 + ring * 1.2) * 6;
+    ctx.beginPath();
+    ctx.globalAlpha = (4 - ring) * 0.07;
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = c;
+    ctx.arc(well.x, well.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = c;
+  ctx.shadowBlur = 28;
+  ctx.shadowColor = c;
+  ctx.arc(well.x, well.y, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderBursts(ctx, bursts) {
+  ctx.save();
+  for (const b of bursts) {
+    const t = b.age / b.maxAge;
+    ctx.strokeStyle = b.color;
+    ctx.shadowColor = b.color;
+    ctx.beginPath();
+    ctx.globalAlpha = (1 - t) * 0.55;
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.arc(b.x, b.y, t * 60, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.globalAlpha = (1 - t) * 0.3;
+    ctx.shadowBlur = 5;
+    ctx.arc(b.x, b.y, t * 35, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawRelation(ctx, a, b, behavior) {
-  const colors = { seek: '#3fb950', flee: '#f85149', orbit: '#58a6ff' };
+  const colors = { seek:'#3fb950', flee:'#f85149', orbit:'#58a6ff', flock:'#f39c12' };
   const c = colors[behavior] || '#8b949e';
+  ctx.save();
   ctx.beginPath();
-  ctx.setLineDash([4, 6]);
-  ctx.globalAlpha = 0.3;
+  ctx.setLineDash([3, 7]);
+  ctx.globalAlpha = 0.18;
   ctx.strokeStyle = c;
   ctx.lineWidth = 1;
+  ctx.shadowBlur = 4;
+  ctx.shadowColor = c;
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawObstacle(ctx, obs) {
+  ctx.save();
   ctx.fillStyle = obs.color;
-  ctx.globalAlpha = 0.55;
-  ctx.fillRect(obs.x - obs.w / 2, obs.y - obs.h / 2, obs.w, obs.h);
-  ctx.globalAlpha = 0.8;
-  ctx.strokeStyle = '#8b949e';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(obs.x - obs.w / 2, obs.y - obs.h / 2, obs.w, obs.h);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.35;
+  ctx.fillRect(obs.x - obs.w/2, obs.y - obs.h/2, obs.w, obs.h);
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = '#636e72';
+  ctx.lineWidth = 1;
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = '#636e72';
+  ctx.strokeRect(obs.x - obs.w/2, obs.y - obs.h/2, obs.w, obs.h);
+  ctx.restore();
 }
 
 function render() {
-  const W = canvas.width;
-  const H = canvas.height;
-  ctx.clearRect(0, 0, W, H);
+  const W = canvas.width, H = canvas.height;
 
-  // Grid
-  ctx.strokeStyle = '#1a2030';
+  // Background + vignette
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#080c14';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = '#0e1520';
   ctx.lineWidth = 1;
-  const gs = 40;
-  for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  const gs = 48;
+  for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Vignette
+  const vig = ctx.createRadialGradient(W/2, H/2, H*0.25, W/2, H/2, H*0.85);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  // Bursts
+  renderBursts(ctx, world.bursts);
+
+  // Gravity wells
+  for (const well of Object.values(world.gravityWells)) drawGravityWell(ctx, well);
 
   // Obstacles
   for (const obs of Object.values(world.obstacles)) drawObstacle(ctx, obs);
 
-  // Relation lines
+  // Relations
   for (const obj of Object.values(world.objects)) {
     if (obj.targetId && world.objects[obj.targetId]) {
       drawRelation(ctx, obj, world.objects[obj.targetId], obj.behavior);
     }
   }
 
-  // Objects
-  for (const obj of Object.values(world.objects)) {
-    drawTrail(ctx, obj.trail, obj.color);
-    drawShape(ctx, obj.shape, obj.x, obj.y, obj.radius, obj.color);
-  }
+  // Trails first, then shapes (so shapes render on top)
+  for (const obj of Object.values(world.objects)) drawTrail(ctx, obj.trail, obj.color);
+  for (const obj of Object.values(world.objects)) drawShape(ctx, obj);
 }
 
 // ─── UI PANELS ────────────────────────────────────────────────────────────────
-const SHAPE_LABELS = { circle: 'cercle', square: 'carré', triangle: 'triangle', star: 'étoile', diamond: 'losange' };
-const BEH_LABELS = { seek: 'suit', flee: 'fuit', orbit: 'orbite', wander: 'erre' };
+const SHAPE_LABELS = { circle:'cercle', square:'carré', triangle:'triangle', star:'étoile', diamond:'losange' };
+const BEH_LABELS = { seek:'suit', flee:'fuit', orbit:'orbite', wander:'erre', flock:'essaim' };
 
 function updatePanels() {
   const objs = Object.values(world.objects);
-  countBadge.textContent = `${objs.length} obj` + (Object.keys(world.obstacles).length ? ` + ${Object.keys(world.obstacles).length} obs` : '');
+  const wells = Object.keys(world.gravityWells).length;
+  const obs = Object.keys(world.obstacles).length;
+  countBadge.textContent = `${objs.length} obj` + (wells ? ` · ${wells}⊕` : '') + (obs ? ` · ${obs}□` : '');
 
   // Structure
   if (objs.length === 0) {
